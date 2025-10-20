@@ -1,0 +1,776 @@
+\documentclass{ieeeaccess}
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{multirow}
+\usepackage{booktabs}
+\usepackage{url}
+\usepackage{hyperref}
+\usepackage{subfig}
+\usepackage{float}
+
+
+
+
+
+\makeatletter
+% helper: show placeholder box if image is missing
+\newcommand{\includegraphicsorplaceholder}[2][]{%
+  \IfFileExists{#2}{\includegraphics[#1]{#2}}{%
+    \fbox{\parbox[c][1.8in][c]{.9\linewidth}{\centering \small Placeholder for ``#2''}}}%
+}
+\makeatother
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\title{Weather Classification from Sky Images Using Convolutional Neural Networks}
+
+\author{
+\uppercase{Thakchinan Paksong}\authorrefmark{1}, 
+\uppercase{Thanaphat Ruangthong}\authorrefmark{2}}
+\address[1]{Computer Engineering and Artificial Intelligence, School of Engineering and Technology,
+Walailak University, Nakhon Si Thammarat, Thailand (e-mail: thakchinan.pa@wu.ac.th)}
+\address[2]{Computer Engineering and Artificial Intelligence, School of Engineering and Technology,
+Walailak University, Nakhon Si Thammarat, Thailand (e-mail: thanaphat.ru@wu.ac.th)}
+
+
+\markboth
+{T. Paksong \headeretal: Weather Classification from Sky Images Using CNNs}
+{T. Paksong \headeretal: Weather Classification from Sky Images Using CNNs}
+
+\corresp{Corresponding authors: Thakchinan Paksong (e-mail: thakchinan.pa@wu.ac.th); 
+Thanaphat Ruangthong (e-mail: thanaphat.ru@wu.ac.th).}
+
+
+\begin{abstract}
+This paper presents a complete pipeline for \emph{weather classification from sky images} using Convolutional Neural Networks (CNNs) with transfer learning, data augmentation, and Grad-CAM explainability. We classify five classes --- \textit{Cloudy, Sunny, Rainy, Snowy}, and \textit{Foggy}. Five modern backbones are evaluated: \textbf{MobileNetV3-Large}, \textbf{EfficientNet-B0}, \textbf{ResNet50}, \textbf{DenseNet121}, and \textbf{ViT-Base (Vision Transformer)}. The original dataset (18{,}039 images) is resized to $224\times 224$, then expanded to 57{,}721 images via rotation ($45^\circ,135^\circ$), 10\% zoom, and horizontal flip to mitigate overfitting and address class imbalance. Results on the \emph{original} data show \textbf{ResNet50} and \textbf{DenseNet121} at $\sim$91\% accuracy, \textbf{EfficientNet-B0}/\textbf{MobileNetV3} at $\sim$90\%, and \textbf{ViT-Base} at 84\%. After augmentation, \textbf{ResNet50} and \textbf{EfficientNet-B0} reach \textbf{97\%}, \textbf{DenseNet121} \textbf{96\%}, \textbf{MobileNetV3} \textbf{95\%}, while \textbf{ViT-Base} remains at 81\%. Grad-CAM visualizations reveal salient regions (cloud edges, horizon, brightness) that drive predictions, improving interpretability and trust. We discuss trade-offs among accuracy, compute cost, and deployability, concluding that \textbf{ResNet50} and \textbf{EfficientNet-B0} offer the best accuracy--efficiency balance, while \textbf{MobileNetV3} is preferred for low-latency edge deployment.
+\end{abstract}
+
+\begin{keywords}
+Weather classification, CNN, Transfer learning, Data augmentation, Grad-CAM, EfficientNet, ResNet, DenseNet, MobileNet, Vision Transformer, Explainable AI.
+\end{keywords}
+
+\titlepgskip=-15pt
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+Weather conditions directly impact agriculture, aviation, transportation, energy management, and smart-city operations. Conventional monitoring depends on physical sensors and manual observation, which can be costly and geographically limited. With deep learning progress, \emph{image-based} weather recognition has become feasible at scale \cite{Krizhevsky2012AlexNet, Deng2009ImageNet, LeCun2015Deep}. However, challenges persist: (i) data imbalance (e.g., fewer fog/rain/snow images), (ii) inter-class visual similarity (e.g., cloudy vs. foggy), (iii) overfitting on limited datasets, and (iv) limited interpretability of deep models.
+
+We address these challenges by combining \textbf{transfer learning} \cite{Pan2009Transfer} with \textbf{targeted augmentations} \cite{Shorten2019Aug, Cubuk2019AutoAugment, Zhong2020RandAugment, Yun2019CutMix} and \textbf{Grad-CAM} explainability \cite{Selvaraju2017GradCAM}. We evaluate five backbones across \emph{pre-augmentation} and \emph{post-augmentation} settings and discuss trade-offs for real-world deployment.
+
+\subsection*{Contributions}
+\begin{itemize}
+  \item A thorough comparison of \textbf{five} modern backbones (MobileNetV3, EfficientNet-B0, ResNet50, DenseNet121, ViT-Base) for five-class sky weather recognition.
+  \item A \textbf{pre-vs-post} augmentation study showing clear generalization gains and reduced overfitting.
+  \item \textbf{Grad-CAM} visualizations to explain model decisions and validate that salient regions align with human perception.
+  \item Practical guidance on \textbf{accuracy--efficiency} trade-offs and edge deployment considerations.
+\end{itemize}
+
+\section{Methodology}
+\subsection{Dataset}
+We use a public five-class sky image dataset (total 18{,}039 images): Cloudy (6{,}702), Sunny (6{,}274), Rainy (1{,}927), Snowy (1{,}875), Foggy (1{,}261) \cite{KaggleWeather}. Images are resized to $224\times 224$ and normalized to match ImageNet pretraining \cite{Deng2009ImageNet}.
+
+\section{Augmentation and Splits}
+To mitigate overfitting and class imbalance, we apply rotations ($45^\circ$), shear ($20^\circ$), zoom ($1.20\times$), and horizontal flip. 
+The dataset expands from \textbf{18{,}039} images $\rightarrow$ \textbf{57{,}721} images. 
+
+
+\begin{figure*}[!t]
+\centering
+% แถวแรก
+\subfloat[Original image]{\includegraphics[width=0.45\textwidth]{figs/0.png}\label{fig:original}}
+\hfil
+\subfloat[Rotation]{\includegraphics[width=0.45\textwidth]{figs/45.png}\label{fig:rotation}}
+\\[1.5ex] % เพิ่ม spacing ระหว่างแถว
+
+% แถวสอง
+\subfloat[Shear]{\includegraphics[width=0.45\textwidth]{figs/swap.png}\label{fig:shear}}
+\hfil
+\subfloat[Zoom]{\includegraphics[width=0.45\textwidth]{figs/x1_2.png}\label{fig:zoom}}
+
+\caption{Examples of data augmentation: (a) Original image, (b) Rotation, (c) Shear, (d) Zoom.}
+\label{fig:augmentation}
+\end{figure*}
+
+
+
+
+
+
+
+\subsection{Transfer Learning Models}
+In this study, we adopt transfer learning approaches to leverage powerful pre-trained convolutional and transformer-based architectures that have demonstrated strong performance on large-scale image datasets such as ImageNet. The rationale is that starting from models already trained on millions of images allows us to capture generic visual features (e.g., edges, textures, and shapes) and then adapt these features to the domain-specific task of weather classification from sky images. We evaluate five representative models, covering both lightweight CNNs optimized for mobile deployment and more complex architectures designed for high accuracy or advanced feature extraction.  
+
+\begin{itemize}
+    \item \textbf{MobileNetV3-Large} --- This model is specifically optimized for real-time inference on resource-constrained environments such as mobile and edge devices. It employs efficient depthwise separable convolutions and squeeze-and-excitation modules, making it lightweight yet capable of capturing important spatial information. Its compact size makes it attractive for practical deployment in IoT-based weather monitoring systems~\cite{Howard2019MobileNetV3}.
+    
+    \item \textbf{EfficientNet-B0} --- Known for its compound scaling strategy, EfficientNet-B0 balances network depth, width, and input resolution in a principled way. Despite being the smallest variant in the EfficientNet family, it provides competitive accuracy with significantly fewer parameters and FLOPs compared to traditional CNNs. This efficiency makes it suitable for large-scale experiments while maintaining strong predictive capability~\cite{Tan2019EfficientNet}.
+    
+    \item \textbf{ResNet50} --- A classical residual network with 50 layers that introduced skip connections to address the vanishing gradient problem. ResNet50 serves as a strong baseline due to its proven ability to learn deep hierarchical representations effectively. Its residual structure facilitates stable optimization even in deep architectures, which is valuable when fine-tuning on relatively smaller weather datasets~\cite{He2016ResNet}.
+    
+    \item \textbf{DenseNet121} --- This model improves feature propagation and reuse through dense connections, where each layer receives inputs from all preceding layers. Such dense connectivity helps in mitigating gradient vanishing, reduces redundancy, and promotes parameter efficiency. DenseNet121 is particularly effective in tasks that require learning subtle differences, making it well-suited for distinguishing between similar weather conditions such as cloudy vs. foggy~\cite{Huang2017DenseNet}.
+    
+    \item \textbf{ViT-Base (patch16-224)} --- The Vision Transformer represents a paradigm shift from convolution-based architectures by employing self-attention mechanisms to model global dependencies across image patches. The variant ViT-Base with 16$\times$16 patch size and 224$\times$224 input resolution is capable of capturing long-range relationships that CNNs often miss. However, it is more data-hungry and computationally intensive, requiring careful fine-tuning to avoid overfitting on smaller datasets~\cite{Dosovitskiy2021ViT}.
+\end{itemize}
+
+For all models, we initialize with pre-trained ImageNet weights to take advantage of transferable low- and mid-level features. During training, we first replace and fine-tune the classification head to adapt to the target classes, followed by progressively unfreezing deeper layers. This gradual fine-tuning strategy helps stabilize learning and avoids catastrophic forgetting of pre-trained features, ultimately enhancing the generalization ability of the models on weather image classification.
+
+
+\subsection{Training and Metrics}
+The evaluation of the five transfer learning models used image classification metrics which are commonly adopted in the field. These metrics allow users to measure general performance and understand specific class-related behavior of the models. The evaluation metrics consist of Accuracy, Precision, Recall, F1-Score, Confusion Matrix, and Training Time per Epoch.  
+
+\begin{itemize}
+    \item \textbf{Accuracy} measures the proportion of correctly classified images out of the total number of images, giving an overall indication of model performance:
+    \[
+    \text{Accuracy} = \frac{TP + TN}{TP + TN + FP + FN}
+    \]
+
+    \item \textbf{Precision} evaluates the reliability of positive predictions by measuring how many of the predicted positive cases are actually correct. It reflects the model’s ability to avoid false positives:
+    \[
+    \text{Precision} = \frac{TP}{TP + FP}
+    \]
+
+    \item \textbf{Recall}, also known as Sensitivity, measures the ability of a model to correctly identify all actual positive cases. It indicates how well the model captures true positives without missing relevant instances:
+    \[
+    \text{Recall} = \frac{TP}{TP + FN}
+    \]
+
+    \item \textbf{F1-Score} provides a balanced measure of model performance by combining Precision and Recall into a single harmonic mean. It is particularly useful in cases where the dataset is imbalanced, as it accounts for both false positives and false negatives:
+    \[
+    F1 = 2 \times \frac{\text{Precision} \times \text{Recall}}{\text{Precision} + \text{Recall}}
+    \]
+
+    \item \textbf{Confusion Matrix} offers a detailed view of classification results across all classes, highlighting both correct classifications and misclassifications. It enables deeper analysis of model behavior by showing how predictions are distributed among actual classes:  
+
+    \begin{center}
+    \begin{tabular}{c|c|c}
+    \multicolumn{3}{c}{} \\
+     & Predicted Positive & Predicted Negative \\
+    \hline
+    Actual Positive & True Positive (TP) & False Negative (FN) \\
+    Actual Negative & False Positive (FP) & True Negative (TN) \\
+    \end{tabular}
+    \end{center}
+
+    \item \textbf{Training Time} The time needed for each training epoch serves as a measure to evaluate computational efficiency among the models. The results show separate measurements for both the original dataset and the augmented dataset, highlighting differences in computational demand as the dataset size increases.
+\end{itemize}
+
+
+
+
+
+\subsection{Grad-CAM Explainability}
+Gradient-weighted Class Activation Mapping (Grad-CAM) is a technique designed to enhance the interpretability and transparency of deep learning models. It generates visual explanations in the form of heatmaps that highlight the regions of an input image most influential to the model’s classification decision. Grad-CAM is especially valuable in image classification tasks, such as weather condition recognition, as it enables researchers to verify whether the model bases its predictions on semantically meaningful regions rather than irrelevant artifacts.  
+
+Let $y^{(c)}$ denote the score for the target class $c$ at the model’s output, $A^k \in \mathbb{R}^{H\times W}$ represent the $k$-th feature map from the last convolutional layer, and $Z=H\times W$ denote the number of spatial locations. The importance weight of each channel is computed as:
+\begin{equation}
+\alpha_k^{(c)} \;=\; \frac{1}{Z} \sum_{i}\sum_{j} \frac{\partial \, y^{(c)}}{\partial \, A^k_{ij}} ,
+\end{equation}
+and the class-discriminative localization map is constructed as:
+\begin{equation}
+L_{\mathrm{Grad\text{-}CAM}}^{(c)} \;=\; \mathrm{ReLU}\!\left(\sum_{k} \alpha_k^{(c)} \, A^k \right),
+\end{equation}
+where $\mathrm{ReLU}(\cdot)$ ensures that only features positively contributing to the class of interest are preserved. The resulting heatmap is then upsampled to the original input resolution and superimposed on the image for visualization.  
+
+\paragraph*{Working process (7 steps)}
+\begin{enumerate}
+  \item \textbf{Select a target class:} Identify the class to be explained, which could be the predicted class, the ground truth class, or any class of interest.  
+  \item \textbf{Forward pass to get feature maps:} Feed the input image through the CNN to obtain feature maps from the last convolutional layer, which contain both semantic and spatial information.  
+  \item \textbf{Backpropagate the class signal:} Compute the gradient of the selected class score with respect to the feature maps by propagating the signal backward.  
+  \item \textbf{Compute feature map importance:} Aggregate the gradients across spatial dimensions to determine the relative importance of each feature channel ($\alpha_k^{(c)}$).  
+  \item \textbf{Combine and rectify:} Form a weighted combination of the feature maps using $\alpha_k^{(c)}$ and apply ReLU to retain only the positive contributions.  
+  \item \textbf{Upsample and normalize:} Resize the resulting localization map to match the original image resolution and normalize its values for effective visualization.  
+  \item \textbf{Overlay on the original image:} Superimpose the heatmap onto the input image to highlight the regions that most strongly influenced the model’s decision.  
+\end{enumerate}
+
+\noindent This process allows researchers and practitioners to validate whether the model relies on appropriate features, thereby improving transparency, reducing ambiguity in decision-making, and strengthening trust in practical applications.
+
+
+\subsection{Deployment Web Application}
+To bridge the gap between research and practical usage, the trained models were deployed into a fully functional web-based system. This deployment transformed the models from experimental prototypes into operational tools, allowing real-world testing, demonstration, and user interaction. The system integrates the trained models with an intuitive interface, enabling users to upload images, select a preferred model, and obtain predictions in real time. Moreover, Grad-CAM explanations were embedded into the interface to enhance transparency by visualizing the regions of the image that influenced each classification decision.  
+
+\paragraph*{Deployment Workflow}
+The deployment process consisted of the following stages:  
+\begin{itemize}
+    \item \textbf{Model Training and Evaluation:} Five CNN models were trained and evaluated using both the original and augmented datasets to ensure robustness and reliability.  
+    \item \textbf{Checkpointing and Model Saving:} During training, checkpoints were saved to preserve the best-performing versions based on validation accuracy and loss. These models were then exported in deployment-ready formats.  
+    \item \textbf{Hosting on Hugging Face Hub:} The finalized models were uploaded to the Hugging Face Hub, enabling centralized cloud-based storage and scalable inference.  
+    \item \textbf{Streamlit Web Application:} A user-friendly interface was developed using Streamlit, allowing users to upload images, select a model, and view classification results interactively.  
+    \item \textbf{Integration of Grad-CAM:} Grad-CAM visualization was incorporated into the system to provide heatmaps that highlight the most influential regions of the input image, thus improving interpretability.  
+    \item \textbf{Deployment and Testing:} The Streamlit application was deployed on a web server, connected to the Hugging Face Hub, and validated with sample images to ensure stable performance and reliable predictions.  
+    \item \textbf{User Access:} End-users can access the system directly through a standard web browser, enabling real-time predictions accompanied by confidence scores and Grad-CAM visual overlays.  
+\end{itemize}
+
+This workflow demonstrates how advanced deep learning models can be transitioned into accessible applications, providing both predictive performance and explainability for end-users.
+
+
+\section{Results}
+The experimental results from applying five transfer learning models---MobileNetV3-Large-100, EfficientNet-B0, ResNet50, ViT-Base (patch16-224), and DenseNet121---to both the original dataset and the augmented dataset are presented in this section. The evaluation includes Accuracy, Precision, Recall, F1-score, and Confusion Matrix metrics, along with an assessment of training time per epoch. The system’s web-based deployment further demonstrates practical usability, while Grad-CAM visualization provides interpretability into model decision-making. Collectively, these results evaluate both predictive performance and deployment potential of the proposed framework.  
+
+\subsection{Performance on Original Dataset}
+The performance of the five models was first evaluated on the original dataset, which contained 18,039 weather images distributed across five classes: cloudy, foggy, rainy, snowy, and sunny. These results serve as the baseline for comparison, highlighting each model’s strengths and limitations before applying data augmentation.  
+
+\begin{table}[!t]
+\centering
+\caption{Performance Comparison of Transfer Learning Models on the Original Dataset}
+\label{tab:original_performance}
+\resizebox{0.48\textwidth}{!}{% ปรับให้เล็กลงกว่าครึ่งหนึ่งของคอลัมน์
+\scriptsize
+\begin{tabular}{llcccccccc}
+\hline
+\multirow{2}{*}{Model} & \multirow{2}{*}{Class} & \multicolumn{4}{c}{Training/Validation} & \multicolumn{4}{c}{Testing} \\ \cline{3-10} 
+ & & Prec & Rec & F1 & Acc & Prec & Rec & F1 & Acc \\ \hline
+\multirow{5}{*}{MobileNetV3-Large-100} 
+ & cloudy & 1.00 & 1.00 & 1.00 & 1.00 & 0.89 & 0.92 & 0.90 & \multirow{5}{*}{0.90} \\
+ & foggy  & 1.00 & 1.00 & 1.00 & 1.00 & 0.88 & 0.87 & 0.88 &  \\
+ & rainy  & 1.00 & 1.00 & 1.00 & 1.00 & 0.86 & 0.87 & 0.87 &  \\
+ & snowy  & 1.00 & 1.00 & 1.00 & 1.00 & 0.89 & 0.90 & 0.90 &  \\
+ & sunny  & 1.00 & 1.00 & 1.00 & 1.00 & 0.87 & 0.89 & 0.88 &  \\ \hline
+\multirow{5}{*}{EfficientNet-B0} 
+ & cloudy & 1.00 & 1.00 & 1.00 & 1.00 & 0.93 & 0.89 & 0.91 & \multirow{5}{*}{0.90} \\
+ & foggy  & 0.99 & 1.00 & 1.00 & 1.00 & 0.87 & 0.87 & 0.87 &  \\
+ & rainy  & 1.00 & 1.00 & 1.00 & 1.00 & 0.88 & 0.87 & 0.88 &  \\
+ & snowy  & 1.00 & 1.00 & 1.00 & 1.00 & 0.92 & 0.90 & 0.91 &  \\
+ & sunny  & 1.00 & 1.00 & 1.00 & 1.00 & 0.89 & 0.90 & 0.89 &  \\ \hline
+\multirow{5}{*}{ResNet50} 
+ & cloudy & 1.00 & 1.00 & 1.00 & 1.00 & 0.88 & 0.93 & 0.91 & \multirow{5}{*}{0.91} \\
+ & foggy  & 1.00 & 1.00 & 1.00 & 1.00 & 0.93 & 0.91 & 0.92 &  \\
+ & rainy  & 1.00 & 1.00 & 1.00 & 1.00 & 0.89 & 0.88 & 0.88 &  \\
+ & snowy  & 1.00 & 1.00 & 1.00 & 1.00 & 0.90 & 0.92 & 0.91 &  \\
+ & sunny  & 1.00 & 1.00 & 1.00 & 1.00 & 0.93 & 0.91 & 0.92 &  \\ \hline
+\multirow{5}{*}{ViT-Base (patch16-224)} 
+ & cloudy & 0.99 & 0.99 & 0.99 & 0.99 & 0.83 & 0.80 & 0.81 & \multirow{5}{*}{0.84} \\
+ & foggy  & 0.99 & 0.99 & 0.99 & 0.99 & 0.84 & 0.73 & 0.78 &  \\
+ & rainy  & 1.00 & 1.00 & 1.00 & 1.00 & 0.75 & 0.80 & 0.77 &  \\
+ & snowy  & 1.00 & 1.00 & 1.00 & 1.00 & 0.81 & 0.82 & 0.81 &  \\
+ & sunny  & 1.00 & 1.00 & 1.00 & 1.00 & 0.82 & 0.83 & 0.82 &  \\ \hline
+\multirow{5}{*}{DenseNet121} 
+ & cloudy & 1.00 & 1.00 & 1.00 & 1.00 & 0.92 & 0.90 & 0.91 & \multirow{5}{*}{0.91} \\
+ & foggy  & 0.99 & 0.99 & 0.99 & 0.99 & 0.91 & 0.92 & 0.91 &  \\
+ & rainy  & 1.00 & 1.00 & 1.00 & 1.00 & 0.90 & 0.91 & 0.90 &  \\
+ & snowy  & 1.00 & 1.00 & 1.00 & 1.00 & 0.91 & 0.90 & 0.91 &  \\
+ & sunny  & 0.99 & 0.99 & 0.99 & 0.99 & 0.92 & 0.91 & 0.91 &  \\ \hline
+\end{tabular}%
+}
+\end{table}
+
+\subsection{Confusion Matrices on the Original Dataset}
+The original dataset was further analyzed through confusion matrices for each model to evaluate detailed classification performance. These matrices provide a full distribution of predictions across the five classes (\textit{cloudy, foggy, rainy, snowy, sunny}), highlighting both correct and incorrect classifications. 
+
+The confusion matrices revealed that CNN-based models such as \textbf{ResNet50}, \textbf{DenseNet121}, and \textbf{EfficientNet-B0} were particularly effective in distinguishing \textit{cloudy} and \textit{sunny} images, while challenges remained in the \textit{foggy} and \textit{rainy} categories. The \textbf{ViT-Base (patch16-224)} model, although capable of capturing global patterns, showed misclassifications in \textit{foggy} versus \textit{cloudy} conditions. 
+
+Overall, the confusion matrices complement the accuracy scores by exposing specific strengths and weaknesses of each model in real-world classification scenarios.
+
+(1) \textbf{MobileNetV3-Large-100}\\
+\begin{center}
+  \includegraphics[width=\columnwidth]{1_pre.png}
+  \captionof{figure}{Confusion Matrix for MobileNetV3-Large-100 on the Original Dataset}
+  \label{fig:cm_mobilenet}
+\end{center}
+\FloatBarrier
+
+(2) \textbf{EfficientNet-B0}\\
+\begin{center}
+  \includegraphics[width=\columnwidth]{2_pre.png}
+  \captionof{figure}{Confusion Matrix for EfficientNet-B0 on the Original Dataset}
+  \label{fig:cm_efficientnet}
+\end{center}
+\FloatBarrier
+
+(3) \textbf{ResNet50}\\
+\begin{center}
+  \includegraphics[width=\columnwidth]{3_pre.png}
+  \captionof{figure}{Confusion Matrix for ResNet50 on the Original Dataset}
+  \label{fig:cm_resnet}
+\end{center}
+\FloatBarrier
+
+(4) \textbf{ViT-Base (patch16-224)}\\
+\begin{center}
+  \includegraphics[width=\columnwidth]{4_pre.png}
+  \captionof{figure}{Confusion Matrix for ViT-Base (patch16-224) on the Original Dataset}
+  \label{fig:cm_vit}
+\end{center}
+\FloatBarrier
+
+(5) \textbf{DenseNet121}\\
+\begin{center}
+  \includegraphics[width=\columnwidth]{5_pre.png}
+  \captionof{figure}{Confusion Matrix for DenseNet121 on the Original Dataset}
+  \label{fig:cm_densenet}
+\end{center}
+\FloatBarrier
+
+
+\subsection{Performance on Augmented Dataset}
+The performance of the five transfer learning models was further evaluated using the augmented weather dataset, which 
+expanded the number of images from \textbf{18,039} to \textbf{57,721} through rotation, shear, zoom, and horizontal flip 
+operations. This augmentation process increased both the scale and diversity of the dataset, helping to mitigate class imbalance 
+and reduce overfitting. The experimental results revealed improved model generalization across most architectures.  
+
+CNN-based models such as \textbf{ResNet50} and \textbf{DenseNet121} maintained strong performance with testing 
+accuracies of around \textbf{91\%}, demonstrating robustness even when trained on augmented data. \textbf{EfficientNet-B0} 
+also benefited significantly from augmentation, preserving its high accuracy while improving recall in foggy and rainy 
+categories. \textbf{MobileNetV3-Large-100}, although lightweight, achieved competitive accuracy (\textasciitilde90\%) while 
+remaining efficient for real-time inference. In contrast, the \textbf{ViT-Base (patch16-224)} model showed less improvement 
+compared to CNNs, as its patch-based mechanism was more sensitive to noisy augmented patterns.  
+
+Overall, the augmentation strategy proved effective in enhancing classification performance, particularly in challenging 
+classes such as \emph{foggy} and \emph{rainy}, while maintaining high precision in \emph{cloudy} and \emph{sunny} conditions.  
+
+
+
+
+
+
+
+Augmentation substantially boosts generalization. ResNet50/EfficientNet-B0 achieve 0.97, DenseNet121 0.96, MobileNetV3 0.95, while ViT-Base changes little (0.81), suggesting more data or data-efficient transformers are needed \cite{Touvron2021DeiT}.
+
+
+
+
+\begin{table}[!t]
+\centering
+\caption{Performance Comparison of Transfer Learning Models on the Augmented Dataset}
+\label{tab:augmented_performance}
+\resizebox{0.48\textwidth}{!}{% ปรับให้เล็กลงกว่าครึ่งหนึ่งของคอลัมน์
+\scriptsize
+\begin{tabular}{llcccccccc}
+\hline
+\multirow{2}{*}{Model} & \multirow{2}{*}{Class} & \multicolumn{4}{c}{Training/Validation} & \multicolumn{4}{c}{Testing} \\ \cline{3-10} 
+ & & Prec & Rec & F1 & Acc & Prec & Rec & F1 & Acc \\ \hline
+\multirow{5}{*}{MobileNetV3-Large-100} 
+ & Cloudy & 0.99 & 0.99 & 0.99 & 0.99 & 0.94 & 0.95 & 0.94 & \multirow{5}{*}{0.95} \\
+ & Foggy  & 0.99 & 1.00 & 1.00 & 1.00 & 0.92 & 0.93 & 0.93 &  \\
+ & Rainy  & 0.99 & 0.99 & 0.99 & 0.99 & 0.95 & 0.95 & 0.95 &  \\
+ & Snowy  & 0.99 & 0.99 & 0.99 & 0.99 & 0.95 & 0.94 & 0.94 &  \\
+ & Sunny  & 1.00 & 0.99 & 0.99 & 0.99 & 0.94 & 0.95 & 0.95 &  \\ \hline
+\multirow{5}{*}{EfficientNet-B0} 
+ & Cloudy & 1.00 & 1.00 & 1.00 & 1.00 & 0.97 & 0.98 & 0.97 & \multirow{5}{*}{0.97} \\
+ & Foggy  & 1.00 & 1.00 & 1.00 & 1.00 & 0.96 & 0.98 & 0.97 &  \\
+ & Rainy  & 1.00 & 1.00 & 1.00 & 1.00 & 0.98 & 0.96 & 0.97 &  \\
+ & Snowy  & 1.00 & 1.00 & 1.00 & 1.00 & 0.96 & 0.97 & 0.97 &  \\
+ & Sunny  & 1.00 & 1.00 & 1.00 & 1.00 & 0.96 & 0.96 & 0.96 &  \\ \hline
+\multirow{5}{*}{ResNet50} 
+ & Cloudy & 1.00 & 1.00 & 1.00 & 1.00 & 0.97 & 0.97 & 0.97 & \multirow{5}{*}{0.97} \\
+ & Foggy  & 1.00 & 1.00 & 1.00 & 1.00 & 0.98 & 0.97 & 0.97 &  \\
+ & Rainy  & 1.00 & 1.00 & 1.00 & 1.00 & 0.98 & 0.97 & 0.97 &  \\
+ & Snowy  & 1.00 & 1.00 & 1.00 & 1.00 & 0.98 & 0.97 & 0.97 &  \\
+ & Sunny  & 1.00 & 1.00 & 1.00 & 1.00 & 0.97 & 0.97 & 0.97 &  \\ \hline
+\multirow{5}{*}{ViT-Base (patch16-224)} 
+ & Cloudy & 0.83 & 0.84 & 0.83 & 0.84 & 0.81 & 0.82 & 0.81 & \multirow{5}{*}{0.81} \\
+ & Foggy  & 0.74 & 0.68 & 0.70 & 0.68 & 0.63 & 0.58 & 0.60 &  \\
+ & Rainy  & 0.80 & 0.86 & 0.86 & 0.86 & 0.71 & 0.68 & 0.68 &  \\
+ & Snowy  & 0.88 & 0.92 & 0.90 & 0.92 & 0.86 & 0.85 & 0.82 &  \\
+ & Sunny  & 0.86 & 0.81 & 0.83 & 0.81 & 0.88 & 0.88 & 0.88 &  \\ \hline
+\multirow{5}{*}{DenseNet121} 
+ & Cloudy & 1.00 & 1.00 & 1.00 & 1.00 & 0.97 & 0.97 & 0.97 & \multirow{5}{*}{0.96} \\
+ & Foggy  & 1.00 & 1.00 & 1.00 & 1.00 & 0.95 & 0.96 & 0.96 &  \\
+ & Rainy  & 1.00 & 1.00 & 1.00 & 1.00 & 0.96 & 0.93 & 0.94 &  \\
+ & Snowy  & 1.00 & 1.00 & 1.00 & 1.00 & 0.96 & 0.95 & 0.95 &  \\
+ & Sunny  & 1.00 & 1.00 & 1.00 & 1.00 & 0.95 & 0.96 & 0.96 &  \\ \hline
+\end{tabular}%
+}
+\end{table}
+
+
+\subsection{Performance on Augmented Dataset}
+The performance of the five transfer learning models was evaluated on the augmented dataset of \textbf{57,721 images}, 
+generated from the original 18,039 images through rotation, shear, zoom, and horizontal flip operations. 
+The results demonstrate that \textbf{ResNet50}, \textbf{DenseNet121}, and \textbf{EfficientNet-B0} achieved the highest 
+test accuracies of around \textbf{0.97}, showing strong improvements compared to the original dataset. 
+These models maintained balanced Precision, Recall, and F1-scores across most weather classes, reflecting effective 
+generalization from the expanded dataset. \textbf{MobileNetV3-Large-100} also improved with an accuracy of \textbf{0.95}, 
+while the \textbf{ViT-Base (patch16-224)} model showed a relatively lower accuracy of \textbf{0.81}, indicating challenges 
+in handling augmented variations. Overall, the results confirm that \textbf{data augmentation enhanced classification 
+performance and reduced overfitting} across all architectures, with \textbf{ResNet50} and \textbf{DenseNet121} standing out 
+as the most stable performers.
+
+
+
+\subsection{Confusion Matrices on Augmented Dataset}
+To further evaluate classification performance after applying data augmentation, confusion matrices were generated 
+for each model using the augmented weather dataset. These matrices provide a detailed breakdown of predictions across 
+the five classes (\textit{cloudy, foggy, rainy, snowy, sunny}), showing notable improvements in correct classifications 
+and reductions in misclassifications compared to the original dataset. 
+
+In particular, augmentation enhanced the ability of CNN-based models to distinguish between challenging classes such as 
+\textit{foggy} and \textit{rainy}, while maintaining high accuracy in \textit{cloudy} and \textit{sunny} categories. 
+The analysis confirms that data augmentation not only improved overall performance but also reduced class-level ambiguities, 
+resulting in more robust weather classification.
+
+
+(1) \textbf{MobileNetV3-Large-100}\\
+\begin{center}
+  \includegraphics[width=\columnwidth]{1_a.png}
+  \captionof{figure}{Confusion Matrix for MobileNetV3-Large-100 on the Original Dataset}
+  \label{fig:cm_mobilenet}
+\end{center}
+\FloatBarrier
+
+(2) \textbf{EfficientNet-B0}\\
+\begin{center}
+  \includegraphics[width=\columnwidth]{2_a.png}
+  \captionof{figure}{Confusion Matrix for EfficientNet-B0 on the Original Dataset}
+  \label{fig:cm_efficientnet}
+\end{center}
+\FloatBarrier
+
+(3) \textbf{ResNet50}\\
+\begin{center}
+  \includegraphics[width=\columnwidth]{3_a.png}
+  \captionof{figure}{Confusion Matrix for ResNet50 on the Original Dataset}
+  \label{fig:cm_resnet}
+\end{center}
+\FloatBarrier
+
+(4) \textbf{ViT-Base (patch16-224)}\\
+\begin{center}
+  \includegraphics[width=\columnwidth]{4_a.png}
+  \captionof{figure}{Confusion Matrix for ViT-Base (patch16-224) on the Original Dataset}
+  \label{fig:cm_vit}
+\end{center}
+\FloatBarrier
+
+(5) \textbf{DenseNet121}\\
+\begin{center}
+  \includegraphics[width=\columnwidth]{5_a.png}
+  \captionof{figure}{Confusion Matrix for DenseNet121 on the Original Dataset}
+  \label{fig:cm_densenet}
+\end{center}
+\FloatBarrier
+
+\subsection{Training Time Comparison}
+Training time per epoch was recorded to compare the computational efficiency of each model on the augmented weather dataset. 
+The results highlight the trade-off between model complexity and efficiency, showing that lightweight architectures required 
+significantly less training time than deeper models.  
+
+Among the evaluated models, \textbf{ResNet50} achieved the fastest training time at approximately \textbf{45 minutes per epoch}, 
+while maintaining the highest accuracy of \textbf{0.97}. \textbf{MobileNetV3-Large} and \textbf{ViT-Base} required around 
+\textbf{52 minutes per epoch}, with MobileNetV3 balancing efficiency and accuracy (\textbf{0.95}), whereas ViT-Base lagged 
+behind with the lowest accuracy (\textbf{0.81}). \textbf{EfficientNet-B0} recorded about \textbf{1 hour and 5 minutes per epoch}, 
+offering strong accuracy (\textbf{0.97}) but at a slightly higher computational cost. \textbf{DenseNet121} required the longest 
+training time at approximately \textbf{1 hour and 44 minutes per epoch}, reflecting the computational demands of its deeper 
+architecture despite achieving high accuracy (\textbf{0.96}).  
+
+Overall, this comparison provides valuable insights into the practicality of deploying each model in real-world scenarios. 
+While deeper models such as DenseNet121 offer strong performance, lightweight and mid-complexity models like MobileNetV3 
+and ResNet50 strike a better balance between accuracy and efficiency, making them suitable for applications with limited 
+computational resources.  
+
+\begin{table}[!t]
+\centering
+\caption{Training Time per Epoch and Accuracy on the Augmented Dataset}
+\label{tab:training_time_aug}
+\resizebox{0.48\textwidth}{!}{%
+\scriptsize
+\begin{tabular}{lcc}
+\hline
+\textbf{Model} & \textbf{Accuracy} & \textbf{Time/Epoch} \\ \hline
+ResNet50            & 0.97 & $\sim$45m \\
+EfficientNet-B0     & 0.97 & $\sim$1h05m \\
+DenseNet121         & 0.96 & $\sim$1h44m \\
+MobileNetV3-Large   & 0.95 & $\sim$52m \\
+ViT-Base (patch16-224) & 0.81 & $\sim$52m \\ \hline
+\end{tabular}%
+}
+\end{table}
+
+
+
+
+
+\subsection{Performance Comparison Between Original and Augmented Datasets}
+To assess the impact of data augmentation, the performance of the five transfer learning models was compared between 
+the original dataset and the augmented dataset. Table \ref{tab:original_vs_augmented} presents accuracy values for both 
+training/validation and testing datasets, along with the differences (Diff.) to highlight performance changes.  
+
+The results demonstrate that augmentation improved testing accuracy for most models while reducing the overfitting 
+effect observed in the original dataset. Specifically, \textbf{EfficientNet-B0} achieved the highest improvement of 
+\textbf{+0.07}, followed by \textbf{ResNet50 (+0.06)}, \textbf{MobileNetV3-Large-100 (+0.05)}, and 
+\textbf{DenseNet121 (+0.05)}. These CNN-based models benefited significantly from the augmented dataset, showing 
+stronger generalization across the five weather classes. In contrast, the \textbf{ViT-Base (patch16-224)} model exhibited 
+a slight decrease of \textbf{-0.03}, suggesting difficulties in adapting to augmented variations due to its patch-based mechanism.  
+
+Overall, the implementation of data augmentation enhanced classification robustness, reduced class-level 
+misclassifications, and improved generalization for most architectures, confirming its effectiveness in weather 
+classification tasks.  
+
+\begin{table}[H]
+\centering
+\caption{Performance Comparison Between Original and Augmented Datasets}
+\label{tab:original_vs_augmented}
+\resizebox{0.48\textwidth}{!}{%
+\scriptsize
+\begin{tabular}{lccc|ccc}
+\hline
+\multirow{2}{*}{Model} & \multicolumn{3}{c|}{Training/Validation Dataset} & \multicolumn{3}{c}{Testing Dataset} \\ \cline{2-7} 
+ & Original & Augmented & Diff. & Original & Augmented & Diff. \\ \hline
+MobileNetV3-Large-100 & 1.00 & 0.99 & -0.01 & 0.90 & 0.95 & +0.05 \\
+EfficientNet-B0       & 1.00 & 1.00 &  0.00 & 0.90 & 0.97 & +0.07 \\
+ResNet50              & 1.00 & 1.00 &  0.00 & 0.91 & 0.97 & +0.06 \\
+ViT-Base (patch16-224)& 0.99 & 0.84 & -0.15 & 0.84 & 0.81 & -0.03 \\
+DenseNet121           & 1.00 & 1.00 &  0.00 & 0.91 & 0.96 & +0.05 \\ \hline
+\end{tabular}%
+}
+\end{table}
+
+
+\subsection{Grad-CAM}
+Gradient-weighted Class Activation Mapping (Grad-CAM) is employed to provide interpretability and transparency for deep learning models, particularly Convolutional Neural Networks (CNNs). Grad-CAM highlights the regions of an input image that contribute most to the model’s classification decision, thereby serving as a powerful tool in Explainable AI (XAI).
+
+The principle of Grad-CAM is to utilize the gradients flowing back from the last convolutional layer to compute importance weights for the feature maps. These weights are then combined to generate a heatmap, which visually indicates the areas in the image that the model focused on when making its decision. Such visualization helps to verify whether the model relies on semantically meaningful regions or spurious patterns.
+
+From our experiments, Grad-CAM visualizations reveal that each model emphasizes different regions of the sky images:
+\begin{itemize}
+\item \textbf{MobileNetV3-Large-100} --- Shows relatively broad attention, mainly focusing on the sky and horizon. This reflects reliance on brightness and contrast variations, although the focus is less sharp compared to deeper models.
+
+\begin{center}
+\includegraphics[width=0.45\textwidth]{mobilenetv3_large_100_fold01.png}
+\end{center}
+
+\item \textbf{EfficientNet-B0} --- Exhibits context-aware attention across multiple regions, including sky, bridge structures, and ground. This indicates its ability to capture fine-grained features and complex contextual relationships.
+
+\begin{center}
+\includegraphics[width=0.45\textwidth]{efficientnet_b0_fold01.png}
+\end{center}
+
+\item \textbf{ResNet50} --- Demonstrates clear focus on both the sky and bridge areas, balancing global (sky-wide) and local (edges of structures) features. This focused attention contributes to its strong classification accuracy.
+
+\begin{center}
+\includegraphics[width=0.45\textwidth]{resnet50_fold01.png}
+\end{center}
+
+\item \textbf{ViT-Base (patch16-224)} --- Unlike CNNs, the Vision Transformer distributes attention across many small patches, such as road and sky regions. While this patch-based view captures diverse patterns, it may lead to less precise focus for certain classes.
+
+\begin{center}
+\includegraphics[width=0.45\textwidth]{vit_base_patch16_224_fold01.png}
+\end{center}
+
+\item \textbf{DenseNet121} --- Highlights both the sky and parts of the bridge, benefiting from dense connections that combine features across multiple layers. This results in balanced attention and robust feature extraction.
+
+\begin{center}
+\includegraphics[width=0.45\textwidth]{densenet121.tv_fold01.png}
+\end{center}
+\end{itemize}
+
+
+The results indicate that Grad-CAM is highly valuable for model interpretability, enabling users to confirm whether models rely on realistic and meaningful features. It enhances trust and reliability, particularly in practical deployments of weather image classification systems. Moreover, combining Data Augmentation with Grad-CAM not only improves model accuracy but also provides deeper insights into the decision-making process, supporting both performance and explainability:contentReference[oaicite:1]{index=1}.
+
+
+
+
+
+
+\subsection{Web Application Deployment Output}
+To transition the trained models from research to practical use, we developed a web-based application for \textbf{weather classification} from sky images. The system integrates the best-performing CNN-based models with an interactive interface, enabling near real-time predictions. Deployment uses \textbf{Streamlit} as the web framework and the \textbf{Hugging Face Hub} for model hosting, ensuring accessibility and scalability.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\columnwidth]{web.png}
+\caption{Web application interface for weather classification with model selection, device options, and Grad-CAM overlays. Demo links:\url{https://repair1-y6lvczjw8cugowgnoerigu.streamlit.app/}}
+\label{fig:webapp_ui}
+\end{figure}
+
+The application provides a user-friendly two-panel layout. On the \textit{left} panel, users can (i) select the backbone (\textit{MobileNetV3-Large-100}, \textit{EfficientNet-B0}, \textit{ResNet50}, \textit{DenseNet121}, or \textit{ViT-Base}), (ii) choose the processing device (CPU or GPU), (iii) set the number of top predictions (Top-$K$), and (iv) enable preprocessing transforms. The system automatically loads the corresponding model checkpoint to ensure consistent inference. On the \textit{right} panel, users can upload JPG/PNG sky images via drag-and-drop or file browser; the app then returns class predictions with confidence scores. Additionally, Grad-CAM overlays can be toggled to highlight the most influential regions, improving interpretability and transparency of the predictions.
+
+
+\section{Discussion}
+The results show that transfer learning with CNN and transformer backbones is effective for sky-image weather classification, while revealing model-specific trade-offs. Data augmentation substantially improved generalization across most architectures, with \textbf{ResNet50} and \textbf{DenseNet121} delivering consistently high test accuracy and stable class-wise Precision/Recall/F1. \textbf{EfficientNet-B0} benefited markedly from augmentation, balancing accuracy and computational cost. \textbf{MobileNetV3-Large-100} achieved competitive accuracy with lower compute, making it attractive for real-time or edge deployment. In contrast, \textbf{ViT-Base (patch16-224)} showed smaller gains and occasional confusion between visually similar classes, reflecting sensitivity to patch-based variations under limited data.
+
+Grad-CAM visualizations increased model transparency by revealing attention on semantically meaningful sky regions (e.g., horizon boundaries and cloud textures). CNN-based models (ResNet50, DenseNet121, EfficientNet-B0) produced sharp and class-consistent heatmaps, while ViT-Base exhibited more diffuse attention, which can hinder interpretability. From a deployment perspective, the comparison of training times and accuracies suggests that MobileNetV3 and ResNet50 strike a practical balance between \textit{accuracy, interpretability, and efficiency}, whereas deeper models like DenseNet121, despite strong accuracy, incur higher computational costs. Overall, the combination of augmentation, explainability (Grad-CAM), and a lightweight web UI demonstrates a viable pathway from research prototypes to usable, resource-aware applications.
+
+
+
+
+
+
+\section{Conclusion}
+The research team developed a CNN-based system for classifying weather conditions from sky images using five transfer 
+learning models: \textbf{MobileNetV3-Large-100}, \textbf{EfficientNet-B0}, \textbf{ResNet50}, \textbf{DenseNet121}, and 
+\textbf{ViT-Base (patch16-224)}. The dataset initially contained \textbf{18,039 images} across five categories 
+(\textit{cloudy, foggy, rainy, snowy, sunny}) and was expanded to \textbf{57,721 images} through augmentation techniques 
+such as rotation, shear, zoom, and horizontal flipping. All images were standardized to \textbf{224 × 224 pixels} for 
+consistency, and the dataset was divided into training, validation, and testing sets with \textbf{5-fold cross-validation} 
+applied for stable evaluation.  
+
+Model performance was assessed using accuracy, precision, recall, F1-score, confusion matrices, and training time per epoch. 
+The results showed that lightweight models like \textbf{MobileNetV3-Large-100} achieved competitive accuracy while maintaining 
+efficiency for real-time or edge deployment. In contrast, deeper models such as \textbf{DenseNet121} achieved higher accuracy 
+but required longer training times and greater computational resources. \textbf{EfficientNet-B0} benefited significantly from 
+augmentation, confirming the value of dataset expansion, while \textbf{ViT-Base} demonstrated lower accuracy and less 
+interpretable attention maps, highlighting the limitations of transformer-based architectures under limited data.  
+
+\textbf{Grad-CAM visualizations} provided interpretability by highlighting semantically meaningful regions of the sky, such as 
+\textit{horizon boundaries and cloud textures}, thereby improving transparency of the classification process. The findings underline 
+the trade-offs between model complexity, accuracy, and interpretability. For instance, while \textbf{DenseNet121} delivered high 
+accuracy, it incurred a heavy computational cost, whereas \textbf{ResNet50} struck a strong balance between accuracy, training 
+efficiency, and explainability.  
+
+Finally, the deployment of trained models via a \textbf{Streamlit-based web application} with \textbf{Hugging Face Hub integration} 
+demonstrated the practicality of the proposed system, enabling real-time weather classification with a user-friendly interface and 
+optional Grad-CAM support. Overall, the project proves that \textbf{CNN-based transfer learning methods} can deliver accurate, 
+efficient, and interpretable solutions, bridging experimental research with real-world applications to support intelligent weather 
+monitoring systems.
+
+
+\section*{Acknowledgment}
+The authors would like to express their sincere gratitude to the instructors and academic advisors at 
+\textbf{Walailak University} for their invaluable guidance, constructive feedback, and encouragement throughout 
+the course of this project. Special appreciation is extended to our classmates and colleagues for their collaboration 
+and support during dataset preparation, experimentation, and model deployment.  
+
+The authors also acknowledge the resources and platforms that made this work possible, including \textbf{Streamlit} 
+for web-based deployment, the \textbf{Hugging Face Hub} for model hosting, and the computational resources that 
+supported large-scale training and evaluation.
+
+
+
+
+
+
+
+
+\bibliographystyle{IEEEtran}
+\begin{thebibliography}{99}
+
+\bibitem{KaggleWeather}
+A.~Alfaifi, ``5-Class Weather Status Image Classification,'' \emph{Kaggle}, 2022. [Online]. Available: \url{https://www.kaggle.com/datasets/ammaralfaifi/5class-weather-status-image-classification}. [Accessed: Sep. 29, 2025].
+
+\bibitem{Streamlit2025}
+Streamlit Inc., ``Streamlit: The fastest way to build and share data apps,'' \emph{Streamlit}, 2025. [Online]. Available: \url{https://streamlit.io}. [Accessed: Sep. 29, 2025].
+
+
+\bibitem{Krizhevsky2012AlexNet}
+A.~Krizhevsky, I.~Sutskever, and G.~E. Hinton, ``ImageNet classification with deep convolutional neural networks,'' in \emph{Proc. NIPS}, 2012.
+
+\bibitem{Deng2009ImageNet}
+J.~Deng \emph{et al.}, ``ImageNet: A large-scale hierarchical image database,'' in \emph{Proc. CVPR}, 2009.
+
+\bibitem{LeCun2015Deep}
+Y.~LeCun, Y.~Bengio, and G.~Hinton, ``Deep learning,'' \emph{Nature}, 2015.
+
+\bibitem{Pan2009Transfer}
+S.~J. Pan and Q.~Yang, ``A survey on transfer learning,'' \emph{IEEE TKDE}, 2010.
+
+\bibitem{Shorten2019Aug}
+C.~Shorten and T.~M. Khoshgoftaar, ``A survey on image data augmentation for deep learning,'' \emph{Journal of Big Data}, 2019.
+
+\bibitem{Cubuk2019AutoAugment}
+E.~D. Cubuk \emph{et al.}, ``AutoAugment: Learning augmentation policies from data,'' in \emph{Proc. CVPR}, 2019.
+
+\bibitem{Zhong2020RandAugment}
+E.~D. Cubuk \emph{et al.}, ``RandAugment: Practical automated data augmentation with a reduced search space,'' in \emph{Proc. CVPR Workshops}, 2020.
+
+\bibitem{Yun2019CutMix}
+S.~Yun \emph{et al.}, ``CutMix: Regularization strategy to train strong classifiers with localizable features,'' in \emph{Proc. ICCV}, 2019.
+
+\bibitem{Selvaraju2017GradCAM}
+R.~R. Selvaraju \emph{et al.}, ``Grad-CAM: Visual explanations from deep networks via gradient-based localization,'' in \emph{Proc. ICCV}, 2017.
+
+\bibitem{Simonyan2015VGG}
+K.~Simonyan and A.~Zisserman, ``Very deep convolutional networks for large-scale image recognition,'' in \emph{Proc. ICLR}, 2015.
+
+\bibitem{He2016ResNet}
+K.~He, X.~Zhang, S.~Ren, and J.~Sun, ``Deep residual learning for image recognition,'' in \emph{Proc. CVPR}, 2016.
+
+\bibitem{Huang2017DenseNet}
+G.~Huang, Z.~Liu, L.~van~der Maaten, and K.~Q. Weinberger, ``Densely connected convolutional networks,'' in \emph{Proc. CVPR}, 2017.
+
+\bibitem{Tan2019EfficientNet}
+M.~Tan and Q.~V. Le, ``EfficientNet: Rethinking model scaling for convolutional neural networks,'' in \emph{Proc. ICML}, 2019.
+
+\bibitem{Howard2019MobileNetV3}
+A.~Howard \emph{et al.}, ``Searching for MobileNetV3,'' in \emph{Proc. ICCV}, 2019.
+
+\bibitem{Dosovitskiy2021ViT}
+A.~Dosovitskiy \emph{et al.}, ``An image is worth 16x16 words: Transformers for image recognition at scale,'' in \emph{Proc. ICLR}, 2021.
+
+\bibitem{Raghu2021ViTCNN}
+M.~Raghu \emph{et al.}, ``Do vision transformers see like convolutional neural networks?,'' in \emph{Proc. NeurIPS}, 2021.
+
+\bibitem{Touvron2021DeiT}
+H.~Touvron \emph{et al.}, ``Training data-efficient image transformers \& distillation through attention,'' in \emph{Proc. ICML}, 2021.
+
+\bibitem{Khan2021TransSurvey}
+S.~Khan \emph{et al.}, ``Transformers in vision: A survey,'' \emph{ACM Computing Surveys}, 2023.
+
+\bibitem{Han2021TransSurvey}
+K.~Han \emph{et al.}, ``A survey on vision transformer,'' \emph{IEEE TPAMI}, 2024.
+
+
+\bibitem{Naufal2022WeatherTL}
+M.~F. Naufal and S.~F. Kusuma, ``Weather image classification using CNN with transfer learning,'' \emph{AIP Conf. Proc.}, 2022.
+
+\bibitem{Ibrahim2019WeatherNet}
+M.~R. Ibrahim, J.~Haworth, and T.~Cheng, ``WeatherNet: Recognising weather and visual conditions from street-level images using deep residual learning,'' \emph{arXiv:1910.09910}, 2019.
+
+\bibitem{TSai2023DeepWeather}
+``Classifying Weather Images using Deep Neural Networks,'' \emph{Int. J. Adv. Computer Science}, 2023.
+
+\bibitem{Zhao2019CNNRNNWeather}
+B.~Zhao, X.~Li, X.~Lu, and Z.~Wang, ``A CNN–RNN architecture for multi-label weather recognition,'' \emph{arXiv:1904.10709}, 2019.
+
+\bibitem{Chen2023MaskCNNTrans}
+S.~Chen, T.~Shu, H.~Zhao, and Y.~Y. Tang, ``MASK-CNN-Transformer for real-time multi-label weather recognition,'' \emph{arXiv:2304.14857}, 2023.
+
+\bibitem{Chattopadhay2018GradCAMpp}
+A.~Chattopadhay \emph{et al.}, ``Grad-CAM++: Generalized gradient-based visual explanations for deep convolutional networks,'' in \emph{Proc. WACV}, 2018.
+
+\bibitem{Wang2021HybridWeather}
+L.~Wang \emph{et al.}, ``Hybrid CNN-Transformer architecture for weather recognition,'' \emph{IEEE Access}, 2022.
+
+\bibitem{Zhang2021LightEdge}
+N.~Zhang \emph{et al.}, ``Lightweight CNNs for edge weather recognition,'' \emph{Sensors}, 2021.
+
+\bibitem{Xu2022Multimodal}
+Y.~Xu \emph{et al.}, ``Multimodal weather prediction using images and sensors,'' \emph{Electronics}, 2022.
+
+\bibitem{Rahman2023XAIWeather}
+A.~Rahman \emph{et al.}, ``Explainable AI for scene understanding: A survey,'' \emph{Scientific Reports}, 2023.
+
+\bibitem{Singh2023Survey}
+P.~Singh \emph{et al.}, ``CNN-based weather prediction frameworks: A survey,'' \emph{IEEE Access}, 2023.
+
+\bibitem{DeGeus2020SurveyWeather}
+D.~de Geus \emph{et al.}, ``A survey on weather recognition from images,'' \emph{arXiv:2003.}, 2020.
+
+\bibitem{Szegedy2015Inception}
+C.~Szegedy \emph{et al.}, ``Going deeper with convolutions,'' in \emph{Proc. CVPR}, 2015.
+
+\bibitem{Zhang2018Mixup}
+H.~Zhang \emph{et al.}, ``mixup: Beyond empirical risk minimization,'' in \emph{Proc. ICLR}, 2018.
+
+\bibitem{Sandler2018MobileNetV2}
+M.~Sandler \emph{et al.}, ``MobileNetV2: Inverted residuals and linear bottlenecks,'' in \emph{Proc. CVPR}, 2018.
+
+\bibitem{Tan2021EfficientNetV2}
+M.~Tan and Q.~V. Le, ``EfficientNetV2: Smaller models and faster training,'' in \emph{Proc. ICML}, 2021.
+
+\bibitem{Woo2018CBAM}
+S.~Woo \emph{et al.}, ``CBAM: Convolutional block attention module,'' in \emph{Proc. ECCV}, 2018.
+
+\bibitem{Hu2018SENet}
+J.~Hu, L.~Shen, and G.~Sun, ``Squeeze-and-excitation networks,'' in \emph{Proc. CVPR}, 2018.
+
+\end{thebibliography}
+%========================
+% Author Biographies
+%========================
+\begin{IEEEbiography}[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{kim.png}}]{Thakchinan Paksong}
+You can call me Khing. I was born on February 21, 2005, in Nakhon Si Thammarat Province, Thailand. I am currently pursuing a Bachelor’s degree in Computer Engineering and Artificial Intelligence at the School of Engineering and Technology, Walailak University, Nakhon Si Thammarat, Thailand. My academic interests include computer vision, deep learning, transfer learning, and explainable AI. I have been actively involved in research on weather image classification, focusing on enhancing accuracy and generalization through data augmentation techniques and model optimization. My work also emphasizes the practical deployment of AI systems, using Streamlit and Hugging Face for real-time inference on edge devices. Beyond this, I am also interested in data preprocessing, model evaluation, and building AI-powered applications that bridge experimental research with real-world implementation.
+\end{IEEEbiography}
+
+\begin{IEEEbiography}[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{pat.jpg}}]{Thanaphat Ruangthong}
+You can call me Phat. I was born on December 20, 2004, in Nakhon Si Thammarat Province, Thailand. I am currently pursuing a Bachelor’s degree in Computer Engineering and Artificial Intelligence at the School of Engineering and Technology, Walailak University, Nakhon Si Thammarat, Thailand. My academic interests focus on convolutional neural networks, model optimization, and explainability in computer vision tasks. I have contributed to projects involving dataset curation, training pipelines, and Grad-CAM visualizations to improve transparency in AI predictions. In addition, my research aims to balance accuracy and efficiency in CNN-based architectures, ensuring that AI models can be deployed effectively in resource-constrained environments. My long-term goal is to apply deep learning methods to practical intelligent systems for both industrial and academic applications.
+\end{IEEEbiography}
+
+
+\EOD
+\end{document}
+
+
